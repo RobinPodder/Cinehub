@@ -9,8 +9,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Checkout builds branch
+        uses: actions/checkout@v4
+        with:
+          ref: builds
+          path: builds
+        continue-on-error: true
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -22,12 +31,23 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build all extensions
-        run: gradle make
+        working-directory: src
+        run: gradle make makePluginsJson
 
-      - name: Publish to builds branch
+      - name: Prepare builds directory
         run: |
-          cd build
+          mkdir -p builds
+          find src -name "*.cs3" -exec cp {} builds/ \;
+          cp src/build/plugins.json builds/
+          cp src/repo.json builds/ || true
+
+      - name: Push builds
+        run: |
+          cd builds
           git init
+          git checkout -B builds
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
           git add .
-          git -c user.name="GitHub Actions" -c user.email="actions@github.com" commit -m "Build extensions"
+          git commit -m "Build extensions"
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:builds
