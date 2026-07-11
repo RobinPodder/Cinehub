@@ -1,0 +1,8 @@
+{
+    "name": "CineHub24 Repo",
+    "description": "My CineHub24 CloudStream extension",
+    "manifestVersion": 1,
+    "pluginLists": [
+        "https://raw.githubusercontent.com/RobinPodder/Cinehub/builds/plugins.json"
+    ]
+}
