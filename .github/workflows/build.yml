@@ -5,9 +5,6 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,16 +18,16 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Build all extensions
-        run: gradle make
+        run: ./gradlew make
 
-      # ফাইলগুলো builds ব্রাঞ্চে পুশ করার জন্য অফিশিয়াল আউটপুট ডিরেক্টরি
       - name: Publish to builds branch
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          branch: builds
-          folder: build/output # ক্লাউডস্ট্রিম বিল্ডের আসল ফোল্ডার পাথ
-          clean: true
+        run: |
+          cd build
+          git init
+          git add .
+          git -c user.name="GitHub Actions" -c user.email="actions@github.com" commit -m "Build extensions"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:builds
