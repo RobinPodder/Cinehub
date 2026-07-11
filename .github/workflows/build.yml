@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive' # সাব-মডিউল থাকলে তা লোড করার জন্য
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -21,13 +23,16 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # অফিশিয়াল কমান্ড দিয়ে সম্পূর্ণ বিল্ড ও JSON জেনারেট করা
       - name: Build all extensions
-        run: gradle make
-
-      - name: Publish to builds branch
         run: |
-          cd build
-          git init
-          git add .
-          git -c user.name="GitHub Actions" -c user.email="actions@github.com" commit -m "Build extensions"
-          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:builds
+          chmod +x gradlew || true
+          gradle makeMake make
+
+      # ফাইলগুলো builds ব্রাঞ্চে নিরাপদে ডেপ্লয় করা
+      - name: Publish to builds branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: builds
+          folder: build # যদি ভুল ফোল্ডার পুশ হয়, তবে এখানে 'artifacts' লিখে ট্রাই করবেন
+          clean: true
