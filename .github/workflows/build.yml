@@ -11,8 +11,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: 'recursive' # সাব-মডিউল থাকলে তা লোড করার জন্য
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -23,16 +21,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # অফিশিয়াল কমান্ড দিয়ে সম্পূর্ণ বিল্ড ও JSON জেনারেট করা
+      # শুধু 'gradle make' রান করা হবে যা আপনার প্রোজেক্টে অলরেডি কাজ করছিল
       - name: Build all extensions
-        run: |
-          chmod +x gradlew || true
-          gradle makeMake make
+        run: gradle make
 
-      # ফাইলগুলো builds ব্রাঞ্চে নিরাপদে ডেপ্লয় করা
+      # JamesIves অ্যাকশন ব্যবহার করে নিখুঁতভাবে builds ব্রাঞ্চে পুশ করা
       - name: Publish to builds branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: builds
-          folder: build # যদি ভুল ফোল্ডার পুশ হয়, তবে এখানে 'artifacts' লিখে ট্রাই করবেন
+          folder: build # gradle make এর পর সব ফাইল এই ফোল্ডারে জমা হয়
           clean: true
