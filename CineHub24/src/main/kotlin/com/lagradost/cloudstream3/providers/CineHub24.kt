@@ -4,6 +4,9 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 import java.net.URLEncoder
+import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
+import com.lagradost.cloudstream3.plugins.Plugin
+import android.content.Context
 
 class CineHub24 : MainAPI() {
     override var mainUrl = "https://www.cinehub24.com"
@@ -53,7 +56,6 @@ class CineHub24 : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Case 1: `data` is already a direct video file URL
         if (data.contains(".mp4")) {
             callback.invoke(
                 newExtractorLink(
@@ -62,19 +64,17 @@ class CineHub24 : MainAPI() {
                     url = data
                 ) {
                     this.referer = mainUrl
-                    this.quality = Qualities.Unknown.value // we don't actually know the quality here
+                    this.quality = Qualities.Unknown.value
                 }
             )
             return true
         }
 
-        // Case 2: `data` is a page we need to scrape for embedded/linked video sources
         val doc = app.get(data).document
         var found = false
 
         doc.select("iframe[src], video source[src], a[href*='.m3u8'], a[href*='embed'], a[href*='.mp4']")
             .forEach { el ->
-                // attr() never returns null in Jsoup, so use ifBlank instead of ?:
                 val link = el.attr("src").ifBlank { el.attr("href") }
                 if (link.isBlank()) return@forEach
 
@@ -98,5 +98,12 @@ class CineHub24 : MainAPI() {
             }
 
         return found
+    }
+}
+
+@CloudstreamPlugin
+class CineHub24Plugin : Plugin() {
+    override fun load(context: Context) {
+        registerMainAPI(CineHub24())
     }
 }
