@@ -18,11 +18,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build all extensions
-        run: ./gradlew make
+        run: gradle make
 
       - name: Publish to builds branch
         run: |
