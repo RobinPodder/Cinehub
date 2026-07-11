@@ -9,7 +9,6 @@ class CineHub24 : MainAPI() {
     override var mainUrl = "https://www.cinehub24.com"
     override var name = "CineHub24"
     override val hasMainPage = true
-    override val hasSearch = true
     override val supportedTypes = setOf(TvType.Movie)
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
