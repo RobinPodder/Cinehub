@@ -5,8 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 import java.net.URLEncoder
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
-import com.lagradost.cloudstream3.plugins.Plugin
-import android.content.Context
+import com.lagradost.cloudstream3.plugins.BasePlugin
 
 class CineHub24 : MainAPI() {
     override var mainUrl = "https://www.cinehub24.com"
@@ -56,6 +55,7 @@ class CineHub24 : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // Case 1: `data` is already a direct video file URL
         if (data.contains(".mp4")) {
             callback.invoke(
                 newExtractorLink(
@@ -70,6 +70,7 @@ class CineHub24 : MainAPI() {
             return true
         }
 
+        // Case 2: `data` is a page we need to scrape for embedded/linked video sources
         val doc = app.get(data).document
         var found = false
 
@@ -102,8 +103,8 @@ class CineHub24 : MainAPI() {
 }
 
 @CloudstreamPlugin
-class CineHub24Plugin : Plugin() {
-    override fun load(context: Context) {
+class CineHub24Plugin : BasePlugin() {
+    override fun load() {
         registerMainAPI(CineHub24())
     }
 }
