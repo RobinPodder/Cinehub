@@ -1,0 +1,33 @@
+name: Build and publish extensions
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build all extensions
+        run: ./gradlew make
+
+      - name: Publish to builds branch
+        run: |
+          cd build
+          git init
+          git add .
+          git -c user.name="GitHub Actions" -c user.email="actions@github.com" commit -m "Build extensions"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:builds
