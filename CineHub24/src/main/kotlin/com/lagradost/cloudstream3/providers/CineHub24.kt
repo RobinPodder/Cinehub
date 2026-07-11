@@ -8,7 +8,7 @@ import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.BasePlugin
 
 class CineHub24 : MainAPI() {
-    override var mainUrl = "https://www.cinehub24.com"
+    override var mainUrl = "http://www.cinehub24.com"
     override var name = "CineHub24"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Movie)
