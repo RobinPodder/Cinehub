@@ -2,8 +2,8 @@ package com.lagradost.cloudstream3.providers
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.jsoup.nodes.Element
-import java.net.URLEncoder
+import org.json.JSONArray
+import org.json.JSONObject
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.BasePlugin
 
@@ -13,37 +13,75 @@ class CineHub24 : MainAPI() {
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Movie)
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val doc = app.get(mainUrl).document
-        val featured = doc.select("a[href*='/movies/']").mapNotNull { it.toSearchResult() }
-        return newHomePageResponse(
-            list = HomePageList("Featured", featured.take(15)),
-            hasNext = false
-        )
-    }
+    // TODO: verify this against the real image request URL from DevTools -> Network -> Img
+    private val posterBaseUrl = "https://image.tmdb.org/t/p/w500/"
 
-    private fun Element.toSearchResult(): SearchResponse? {
-        val title = selectFirst("h3, .sc-crXcEl, small")?.text()?.trim() ?: return null
-        val href = fixUrlNull(selectFirst("a")?.attr("href")) ?: return null
-        val poster = selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-        return newMovieSearchResponse(title, href, TvType.Movie) {
+    private fun JSONObject.toSearchResult(): SearchResponse {
+        val id = optString("id")
+        val title = optString("MovieTitle").trim()
+        val posterFile = optString("poster")
+        val poster = if (posterFile.isNotBlank() && posterFile != "Array") "$posterBaseUrl$posterFile" else null
+        val watchLink = optString("MovieWatchLink")
+        val plot = optString("MovieStory")
+        val year = optString("MovieYear").toIntOrNull()
+
+        // Encode everything needed into the "url" so load() doesn't need a second request
+        val encodedUrl = listOf(id, title, poster ?: "", watchLink, plot.replace("|", " "))
+            .joinToString("|||")
+
+        return newMovieSearchResponse(title, encodedUrl, TvType.Movie) {
             this.posterUrl = poster
+            this.year = year
         }
     }
 
+    private suspend fun fetchMovies(url: String): List<JSONObject> {
+        return try {
+            val text = app.get(url).text
+            val arr = JSONArray(text)
+            (0 until arr.length()).map { arr.getJSONObject(it) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val categories = listOf(
+            "Latest" to "$mainUrl/movies.php?limit=15",
+            "Hollywood" to "$mainUrl/movies.php?category=Hollywood&limit=15",
+            "Bollywood" to "$mainUrl/movies.php?category=Bollywood&limit=15",
+            "Animation" to "$mainUrl/movies.php?category=Animation&limit=15",
+            "Korean" to "$mainUrl/movies.php?category=Korean&limit=15",
+            "Tamil" to "$mainUrl/movies.php?category=Tamil&limit=15",
+            "Hindi Dubbed" to "$mainUrl/movies.php?category=Hindi+Dubbed&limit=15"
+        )
+
+        val lists = categories.mapNotNull { (catName, url) ->
+            val movies = fetchMovies(url)
+            if (movies.isEmpty()) null
+            else HomePageList(catName, movies.map { it.toSearchResult() })
+        }
+
+        return newHomePageResponse(lists, hasNext = false)
+    }
+
     override suspend fun search(query: String): List<SearchResponse> {
-        val encodedQuery = URLEncoder.encode(query, "UTF-8")
-        val url = "$mainUrl/movies.php?search=$encodedQuery"
-        val doc = app.get(url).document
-        return doc.select("a[href*='/movies/']").mapNotNull { it.toSearchResult() }
+        // No dedicated search endpoint was found, so we fetch a larger batch
+        // and filter locally by title. This won't cover the entire catalog.
+        val movies = fetchMovies("$mainUrl/movies.php?limit=50")
+        return movies
+            .filter { it.optString("MovieTitle").contains(query, ignoreCase = true) }
+            .map { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val doc = app.get(url).document
-        val title = doc.selectFirst("h1, h3.sc-crXcEl, .sc-crXcEl")?.text()?.trim() ?: "Unknown"
-        val poster = doc.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-        val plot = doc.selectFirst("p.text-in-two, .description, p")?.text()
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
+        val parts = url.split("|||")
+        val title = parts.getOrElse(1) { "Unknown" }
+        val poster = parts.getOrElse(2) { "" }.ifBlank { null }
+        val watchLink = parts.getOrElse(3) { "" }
+        val plot = parts.getOrElse(4) { "" }
+
+        return newMovieLoadResponse(title, url, TvType.Movie, watchLink) {
             this.posterUrl = poster
             this.plot = plot
         }
@@ -55,7 +93,7 @@ class CineHub24 : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Case 1: `data` is already a direct video file URL
+        // `data` here is already the direct MovieWatchLink (.mp4) from the API
         if (data.contains(".mp4")) {
             callback.invoke(
                 newExtractorLink(
@@ -69,36 +107,7 @@ class CineHub24 : MainAPI() {
             )
             return true
         }
-
-        // Case 2: `data` is a page we need to scrape for embedded/linked video sources
-        val doc = app.get(data).document
-        var found = false
-
-        doc.select("iframe[src], video source[src], a[href*='.m3u8'], a[href*='embed'], a[href*='.mp4']")
-            .forEach { el ->
-                val link = el.attr("src").ifBlank { el.attr("href") }
-                if (link.isBlank()) return@forEach
-
-                if (link.contains(".mp4") || link.contains(".m3u8") || link.contains("embed")) {
-                    val fixedLink = fixUrlNull(link) ?: return@forEach
-                    val type = if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-
-                    callback.invoke(
-                        newExtractorLink(
-                            source = name,
-                            name = name,
-                            url = fixedLink,
-                            type = type
-                        ) {
-                            this.referer = mainUrl
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
-                    found = true
-                }
-            }
-
-        return found
+        return false
     }
 }
 
