@@ -5,6 +5,10 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+# গিটহাব অ্যাকশনকে builds ব্রাঞ্চে ফাইল লেখার সরাসরি পারমিশন দেওয়া হলো
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,14 +25,21 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # শুধু 'gradle make' রান করা হবে যা আপনার প্রোজেক্টে অলরেডি কাজ করছিল
       - name: Build all extensions
         run: gradle make
 
-      # JamesIves অ্যাকশন ব্যবহার করে নিখুঁতভাবে builds ব্রাঞ্চে পুশ করা
+      # ফাইলগুলো ঠিক কোথায় তৈরি হচ্ছে তা অ্যাকশন লগে দেখার জন্য (Debugging)
+      - name: List files for verification
+        run: |
+          echo "=== Root Files ==="
+          ls -la
+          echo "=== Build Files ==="
+          ls -la build || true
+
+      # পুরো রুট ডিরেক্টরি থেকে জেনারেট হওয়া ফাইল খুঁজে নিয়ে builds ব্রাঞ্চে পুশ করা
       - name: Publish to builds branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: builds
-          folder: build/output
-          clean: true
+          folder: . # রুট ফোল্ডার সিলেক্ট করা হলো যাতে ফাইল মিস না হয়
+          clean: false # আগের বিল্ড রিপোর্ট যেন ডিলিট না হয়
