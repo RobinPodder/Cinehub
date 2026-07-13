@@ -13,7 +13,6 @@ class CineHub24 : MainAPI() {
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Movie)
 
-    // TODO: verify this against the real image request URL from DevTools -> Network -> Img
     private val posterBaseUrl = "https://image.tmdb.org/t/p/w500/"
 
     private fun JSONObject.toSearchResult(): SearchResponse {
@@ -25,7 +24,6 @@ class CineHub24 : MainAPI() {
         val plot = optString("MovieStory")
         val year = optString("MovieYear").toIntOrNull()
 
-        // Encode everything needed into the "url" so load() doesn't need a second request
         val encodedUrl = listOf(id, title, poster ?: "", watchLink, plot.replace("|", " "))
             .joinToString("|||")
 
@@ -35,8 +33,6 @@ class CineHub24 : MainAPI() {
         }
     }
 
-    // The site's frontend (mainUrl) is separate from its API backend, which
-    // lives on a different host entirely, as found via DevTools Network tab
     private val apiUrl = "http://203.76.96.50/api/v1"
 
     private suspend fun fetchMovies(url: String): List<JSONObject> {
@@ -59,13 +55,13 @@ class CineHub24 : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val categories = listOf(
-            "Latest" to "$apiUrl/movies.php?limit=200",
-            "Hollywood" to "$apiUrl/movies.php?category=Hollywood&limit=200",
-            "Bollywood" to "$apiUrl/movies.php?category=Bollywood&limit=200",
-            "Animation" to "$apiUrl/movies.php?category=Animation&limit=200",
-            "Korean" to "$apiUrl/movies.php?category=Korean&limit=200",
-            "Tamil" to "$apiUrl/movies.php?category=Tamil&limit=200",
-            "Hindi Dubbed" to "$apiUrl/movies.php?category=Hindi+Dubbed&limit=200"
+            "Latest" to "$apiUrl/movies.php",                     // no limit
+            "Hollywood" to "$apiUrl/movies.php?category=Hollywood",
+            "Bollywood" to "$apiUrl/movies.php?category=Bollywood",
+            "Animation" to "$apiUrl/movies.php?category=Animation",
+            "Korean" to "$apiUrl/movies.php?category=Korean",
+            "Tamil" to "$apiUrl/movies.php?category=Tamil",
+            "Hindi Dubbed" to "$apiUrl/movies.php?category=Hindi+Dubbed"
         )
 
         val lists = categories.mapNotNull { (catName, url) ->
@@ -78,9 +74,8 @@ class CineHub24 : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // No dedicated search endpoint was found, so we fetch a larger batch
-        // and filter locally by title. This won't cover the entire catalog.
-        val movies = fetchMovies("$apiUrl/movies.php?limit=200")
+        // Also without a limit
+        val movies = fetchMovies("$apiUrl/movies.php")
         return movies
             .filter { it.optString("MovieTitle").contains(query, ignoreCase = true) }
             .map { it.toSearchResult() }
@@ -105,7 +100,6 @@ class CineHub24 : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // `data` here is already the direct MovieWatchLink (.mp4) from the API
         if (data.contains(".mp4")) {
             callback.invoke(
                 newExtractorLink(
