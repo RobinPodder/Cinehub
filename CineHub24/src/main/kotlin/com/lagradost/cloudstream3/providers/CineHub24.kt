@@ -59,7 +59,6 @@ class CineHub24 : MainAPI() {
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // Base movie categories (without 4K)
         val baseCategories = listOf(
             "Latest" to "",
             "Hollywood" to "Hollywood",
@@ -75,7 +74,7 @@ class CineHub24 : MainAPI() {
         val movieLists = mutableListOf<HomePageList>()
 
         baseCategories.forEach { (displayName, categoryParam) ->
-            // Normal version
+            // Normal
             val normalUrl = if (categoryParam.isBlank()) {
                 "$apiUrl/movies.php?limit=$MAX_LIMIT"
             } else {
@@ -88,13 +87,11 @@ class CineHub24 : MainAPI() {
                 )
             }
 
-            // 4K version – now using category=4K (change if needed)
-            // Alternative parameters to try: quality=4K, resolution=4k, genre=4K
+            // 4K variant (try category=4K – adjust if needed)
             val fourKUrl = if (categoryParam.isBlank()) {
-                "$apiUrl/movies.php?category=4K&limit=$MAX_LIMIT"   // for "Latest 4K"
+                "$apiUrl/movies.php?category=4K&limit=$MAX_LIMIT"
             } else {
                 "$apiUrl/movies.php?category=$categoryParam&category=4K&limit=$MAX_LIMIT"
-                // If that doesn't work, try: "$apiUrl/movies.php?category=$categoryParam&quality=4K&limit=$MAX_LIMIT"
             }
             val fourKMovies = fetchMovies(fourKUrl)
             if (fourKMovies.isNotEmpty()) {
@@ -104,7 +101,7 @@ class CineHub24 : MainAPI() {
             }
         }
 
-        // ---- TV SERIES ----
+        // TV Series
         val seriesCategories = listOf(
             "Latest" to "",
             "Hollywood" to "Hollywood",
@@ -163,7 +160,8 @@ class CineHub24 : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        if (data.contains(".mp4")) {
+        // 1. Direct MP4
+        if (data.contains(".mp4", ignoreCase = true)) {
             callback.invoke(
                 newExtractorLink(
                     source = name,
@@ -176,7 +174,52 @@ class CineHub24 : MainAPI() {
             )
             return true
         }
-        return false
+
+        // 2. Try to extract from the page
+        return try {
+            val pageHtml = app.get(data, headers = mapOf("Referer" to mainUrl)).text
+
+            val videoUrl = run {
+                // <source src="...">
+                Regex("""<source\s+src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                    .find(pageHtml)?.groupValues?.get(1)
+                    ?: // <video src="...">
+                    Regex("""<video[^>]*src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                        .find(pageHtml)?.groupValues?.get(1)
+                        ?: // <iframe src="...">
+                        Regex("""<iframe[^>]*src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                            .find(pageHtml)?.groupValues?.get(1)
+                            ?: // JavaScript file/url
+                            Regex("""(?:file|url)\s*[:=]\s*["']([^"']+\.(?:mp4|m3u8))["']""", RegexOption.IGNORE_CASE)
+                                .find(pageHtml)?.groupValues?.get(1)
+            }
+
+            if (videoUrl != null) {
+                val absoluteUrl = when {
+                    videoUrl.startsWith("http") -> videoUrl
+                    videoUrl.startsWith("//") -> "https:$videoUrl"
+                    else -> {
+                        val base = data.substringBeforeLast('/')
+                        "$base/$videoUrl".replace(Regex("(?<!:)//+"), "/")
+                    }
+                }
+                callback.invoke(
+                    newExtractorLink(
+                        source = name,
+                        name = "Extracted Video",
+                        url = absoluteUrl
+                    ) {
+                        this.referer = mainUrl
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 }
 
