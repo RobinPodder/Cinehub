@@ -17,9 +17,6 @@ class CineHub24 : MainAPI() {
 
     private val posterBaseUrl = "https://image.tmdb.org/t/p/w500/"
 
-    // Keywords that indicate 4K/Ultra HD quality
-    private val fourKKeywords = listOf("4K", "2160p", "UHD", "Ultra HD", "2160")
-
     private fun JSONObject.toSearchResult(isSeries: Boolean = false): SearchResponse {
         val id = optString("id")
         val title = optString("MovieTitle").trim()
@@ -41,7 +38,7 @@ class CineHub24 : MainAPI() {
     }
 
     private val apiUrl = "http://203.76.96.50/api/v1"
-    private val tvApiUrl = "http://203.76.96.50/api/v1/tv.php" // guess – change if needed
+    private val tvApiUrl = "http://203.76.96.50/api/v1/tv.php" // change if needed
 
     private suspend fun fetchMovies(url: String): List<JSONObject> {
         return try {
@@ -62,8 +59,8 @@ class CineHub24 : MainAPI() {
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // ---- MOVIES (normal categories) ----
-        val baseCategories = listOf(
+        // ---- MOVIES ----
+        val movieCategories = listOf(
             "Latest" to "",
             "Hollywood" to "Hollywood",
             "Bollywood" to "Bollywood",
@@ -75,37 +72,15 @@ class CineHub24 : MainAPI() {
             "Hindi Dubbed" to "Hindi+Dubbed"
         )
 
-        val movieLists = mutableListOf<HomePageList>()
-
-        baseCategories.forEach { (displayName, categoryParam) ->
+        val movieLists = movieCategories.mapNotNull { (catName, categoryParam) ->
             val url = if (categoryParam.isBlank()) {
                 "$apiUrl/movies.php?limit=$MAX_LIMIT"
             } else {
                 "$apiUrl/movies.php?category=$categoryParam&limit=$MAX_LIMIT"
             }
             val movies = fetchMovies(url)
-            if (movies.isNotEmpty()) {
-                movieLists.add(
-                    HomePageList("Movies - $displayName", movies.map { it.toSearchResult(false) })
-                )
-            }
-        }
-
-        // ---- 4K Movies (filtered from all movies) ----
-        // Fetch all movies (no category) and keep those whose title or watchLink contains 4K keywords
-        val allMovies = fetchMovies("$apiUrl/movies.php?limit=$MAX_LIMIT")
-        val fourKMovies = allMovies.filter { movie ->
-            val title = movie.optString("MovieTitle")
-            val watchLink = movie.optString("MovieWatchLink")
-            fourKKeywords.any { keyword ->
-                title.contains(keyword, ignoreCase = true) ||
-                watchLink.contains(keyword, ignoreCase = true)
-            }
-        }
-        if (fourKMovies.isNotEmpty()) {
-            movieLists.add(
-                HomePageList("4K Movies", fourKMovies.map { it.toSearchResult(false) })
-            )
+            if (movies.isEmpty()) null
+            else HomePageList("Movies - $catName", movies.map { it.toSearchResult(false) })
         }
 
         // ---- TV SERIES ----
@@ -187,17 +162,13 @@ class CineHub24 : MainAPI() {
             val pageHtml = app.get(data, headers = mapOf("Referer" to mainUrl)).text
 
             val videoUrl = run {
-                // <source src="...">
                 Regex("""<source\s+src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
                     .find(pageHtml)?.groupValues?.get(1)
-                    ?: // <video src="...">
-                    Regex("""<video[^>]*src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                    ?: Regex("""<video[^>]*src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
                         .find(pageHtml)?.groupValues?.get(1)
-                        ?: // <iframe src="...">
-                        Regex("""<iframe[^>]*src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                        ?: Regex("""<iframe[^>]*src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
                             .find(pageHtml)?.groupValues?.get(1)
-                            ?: // JavaScript file/url
-                            Regex("""(?:file|url)\s*[:=]\s*["']([^"']+\.(?:mp4|m3u8))["']""", RegexOption.IGNORE_CASE)
+                            ?: Regex("""(?:file|url)\s*[:=]\s*["']([^"']+\.(?:mp4|m3u8))["']""", RegexOption.IGNORE_CASE)
                                 .find(pageHtml)?.groupValues?.get(1)
             }
 
