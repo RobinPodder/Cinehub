@@ -59,13 +59,13 @@ class CineHub24 : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val categories = listOf(
-            "Latest" to "$apiUrl/movies.php?limit=15",
-            "Hollywood" to "$apiUrl/movies.php?category=Hollywood&limit=15",
-            "Bollywood" to "$apiUrl/movies.php?category=Bollywood&limit=15",
-            "Animation" to "$apiUrl/movies.php?category=Animation&limit=15",
-            "Korean" to "$apiUrl/movies.php?category=Korean&limit=15",
-            "Tamil" to "$apiUrl/movies.php?category=Tamil&limit=15",
-            "Hindi Dubbed" to "$apiUrl/movies.php?category=Hindi+Dubbed&limit=15"
+            "Latest" to "$apiUrl/movies.php?limit=200",
+            "Hollywood" to "$apiUrl/movies.php?category=Hollywood&limit=200",
+            "Bollywood" to "$apiUrl/movies.php?category=Bollywood&limit=200",
+            "Animation" to "$apiUrl/movies.php?category=Animation&limit=200",
+            "Korean" to "$apiUrl/movies.php?category=Korean&limit=200",
+            "Tamil" to "$apiUrl/movies.php?category=Tamil&limit=200",
+            "Hindi Dubbed" to "$apiUrl/movies.php?category=Hindi+Dubbed&limit=200"
         )
 
         val lists = categories.mapNotNull { (catName, url) ->
@@ -80,7 +80,7 @@ class CineHub24 : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         // No dedicated search endpoint was found, so we fetch a larger batch
         // and filter locally by title. This won't cover the entire catalog.
-        val movies = fetchMovies("$apiUrl/movies.php?limit=50")
+        val movies = fetchMovies("$apiUrl/movies.php?limit=200")
         return movies
             .filter { it.optString("MovieTitle").contains(query, ignoreCase = true) }
             .map { it.toSearchResult() }
