@@ -74,7 +74,7 @@ class CineHub24 : MainAPI() {
         val movieLists = mutableListOf<HomePageList>()
 
         baseCategories.forEach { (displayName, categoryParam) ->
-            // Normal
+            // Normal version
             val normalUrl = if (categoryParam.isBlank()) {
                 "$apiUrl/movies.php?limit=$MAX_LIMIT"
             } else {
@@ -87,11 +87,12 @@ class CineHub24 : MainAPI() {
                 )
             }
 
-            // 4K variant (try category=4K – adjust if needed)
+            // 4K version – now using quality=4K (more likely to filter actual 4K)
+            // Alternative: try resolution=4K, genre=4K, or type=4K if this doesn't work.
             val fourKUrl = if (categoryParam.isBlank()) {
-                "$apiUrl/movies.php?category=4K&limit=$MAX_LIMIT"
+                "$apiUrl/movies.php?quality=4K&limit=$MAX_LIMIT"   // for "Latest 4K"
             } else {
-                "$apiUrl/movies.php?category=$categoryParam&category=4K&limit=$MAX_LIMIT"
+                "$apiUrl/movies.php?category=$categoryParam&quality=4K&limit=$MAX_LIMIT"
             }
             val fourKMovies = fetchMovies(fourKUrl)
             if (fourKMovies.isNotEmpty()) {
@@ -101,7 +102,7 @@ class CineHub24 : MainAPI() {
             }
         }
 
-        // TV Series
+        // TV Series (no 4K variants)
         val seriesCategories = listOf(
             "Latest" to "",
             "Hollywood" to "Hollywood",
