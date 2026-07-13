@@ -17,6 +17,9 @@ class CineHub24 : MainAPI() {
 
     private val posterBaseUrl = "https://image.tmdb.org/t/p/w500/"
 
+    // Keywords that indicate 4K/Ultra HD quality
+    private val fourKKeywords = listOf("4K", "2160p", "UHD", "Ultra HD", "2160")
+
     private fun JSONObject.toSearchResult(isSeries: Boolean = false): SearchResponse {
         val id = optString("id")
         val title = optString("MovieTitle").trim()
@@ -59,6 +62,7 @@ class CineHub24 : MainAPI() {
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        // ---- MOVIES (normal categories) ----
         val baseCategories = listOf(
             "Latest" to "",
             "Hollywood" to "Hollywood",
@@ -74,35 +78,37 @@ class CineHub24 : MainAPI() {
         val movieLists = mutableListOf<HomePageList>()
 
         baseCategories.forEach { (displayName, categoryParam) ->
-            // Normal version
-            val normalUrl = if (categoryParam.isBlank()) {
+            val url = if (categoryParam.isBlank()) {
                 "$apiUrl/movies.php?limit=$MAX_LIMIT"
             } else {
                 "$apiUrl/movies.php?category=$categoryParam&limit=$MAX_LIMIT"
             }
-            val normalMovies = fetchMovies(normalUrl)
-            if (normalMovies.isNotEmpty()) {
+            val movies = fetchMovies(url)
+            if (movies.isNotEmpty()) {
                 movieLists.add(
-                    HomePageList("Movies - $displayName", normalMovies.map { it.toSearchResult(false) })
-                )
-            }
-
-            // 4K version – now using quality=4K (more likely to filter actual 4K)
-            // Alternative: try resolution=4K, genre=4K, or type=4K if this doesn't work.
-            val fourKUrl = if (categoryParam.isBlank()) {
-                "$apiUrl/movies.php?quality=4K&limit=$MAX_LIMIT"   // for "Latest 4K"
-            } else {
-                "$apiUrl/movies.php?category=$categoryParam&quality=4K&limit=$MAX_LIMIT"
-            }
-            val fourKMovies = fetchMovies(fourKUrl)
-            if (fourKMovies.isNotEmpty()) {
-                movieLists.add(
-                    HomePageList("4K - $displayName", fourKMovies.map { it.toSearchResult(false) })
+                    HomePageList("Movies - $displayName", movies.map { it.toSearchResult(false) })
                 )
             }
         }
 
-        // TV Series (no 4K variants)
+        // ---- 4K Movies (filtered from all movies) ----
+        // Fetch all movies (no category) and keep those whose title or watchLink contains 4K keywords
+        val allMovies = fetchMovies("$apiUrl/movies.php?limit=$MAX_LIMIT")
+        val fourKMovies = allMovies.filter { movie ->
+            val title = movie.optString("MovieTitle")
+            val watchLink = movie.optString("MovieWatchLink")
+            fourKKeywords.any { keyword ->
+                title.contains(keyword, ignoreCase = true) ||
+                watchLink.contains(keyword, ignoreCase = true)
+            }
+        }
+        if (fourKMovies.isNotEmpty()) {
+            movieLists.add(
+                HomePageList("4K Movies", fourKMovies.map { it.toSearchResult(false) })
+            )
+        }
+
+        // ---- TV SERIES ----
         val seriesCategories = listOf(
             "Latest" to "",
             "Hollywood" to "Hollywood",
