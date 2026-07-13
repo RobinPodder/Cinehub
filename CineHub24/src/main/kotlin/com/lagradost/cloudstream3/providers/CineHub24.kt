@@ -35,12 +35,17 @@ class CineHub24 : MainAPI() {
         }
     }
 
+    // The site's frontend (mainUrl) is separate from its API backend, which
+    // lives on a different host entirely, as found via DevTools Network tab
+    private val apiUrl = "http://203.76.96.50/api/v1"
+
     private suspend fun fetchMovies(url: String): List<JSONObject> {
         return try {
             val text = app.get(
                 url,
                 headers = mapOf(
                     "Referer" to "$mainUrl/",
+                    "Origin" to mainUrl,
                     "X-Requested-With" to "XMLHttpRequest",
                     "Accept" to "application/json, text/plain, */*"
                 )
@@ -54,13 +59,13 @@ class CineHub24 : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val categories = listOf(
-            "Latest" to "$mainUrl/movies.php?limit=15",
-            "Hollywood" to "$mainUrl/movies.php?category=Hollywood&limit=15",
-            "Bollywood" to "$mainUrl/movies.php?category=Bollywood&limit=15",
-            "Animation" to "$mainUrl/movies.php?category=Animation&limit=15",
-            "Korean" to "$mainUrl/movies.php?category=Korean&limit=15",
-            "Tamil" to "$mainUrl/movies.php?category=Tamil&limit=15",
-            "Hindi Dubbed" to "$mainUrl/movies.php?category=Hindi+Dubbed&limit=15"
+            "Latest" to "$apiUrl/movies.php?limit=15",
+            "Hollywood" to "$apiUrl/movies.php?category=Hollywood&limit=15",
+            "Bollywood" to "$apiUrl/movies.php?category=Bollywood&limit=15",
+            "Animation" to "$apiUrl/movies.php?category=Animation&limit=15",
+            "Korean" to "$apiUrl/movies.php?category=Korean&limit=15",
+            "Tamil" to "$apiUrl/movies.php?category=Tamil&limit=15",
+            "Hindi Dubbed" to "$apiUrl/movies.php?category=Hindi+Dubbed&limit=15"
         )
 
         val lists = categories.mapNotNull { (catName, url) ->
@@ -75,7 +80,7 @@ class CineHub24 : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         // No dedicated search endpoint was found, so we fetch a larger batch
         // and filter locally by title. This won't cover the entire catalog.
-        val movies = fetchMovies("$mainUrl/movies.php?limit=50")
+        val movies = fetchMovies("$apiUrl/movies.php?limit=50")
         return movies
             .filter { it.optString("MovieTitle").contains(query, ignoreCase = true) }
             .map { it.toSearchResult() }
