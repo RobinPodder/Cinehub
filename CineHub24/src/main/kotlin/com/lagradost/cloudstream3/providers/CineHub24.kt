@@ -7,7 +7,6 @@ import org.json.JSONObject
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.BasePlugin
 
-// Moved to top level – allows const val
 private const val MAX_LIMIT = 99999
 
 class CineHub24 : MainAPI() {
@@ -60,39 +59,69 @@ class CineHub24 : MainAPI() {
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // ---- MOVIES ----
-        val movieCategories = listOf(
-            "Latest" to "$apiUrl/movies.php?limit=$MAX_LIMIT",
-            "Hollywood" to "$apiUrl/movies.php?category=Hollywood&limit=$MAX_LIMIT",
-            "Bollywood" to "$apiUrl/movies.php?category=Bollywood&limit=$MAX_LIMIT",
-            "Animation" to "$apiUrl/movies.php?category=Animation&limit=$MAX_LIMIT",
-            "Franch" to "$apiUrl/movies.php?category=Franch&limit=$MAX_LIMIT",
-            "Indian Bangla" to "$apiUrl/movies.php?category=Indian+Bangla&limit=$MAX_LIMIT",
-            "Korean" to "$apiUrl/movies.php?category=Korean&limit=$MAX_LIMIT",
-            "Tamil" to "$apiUrl/movies.php?category=Tamil&limit=$MAX_LIMIT",
-            "Hindi Dubbed" to "$apiUrl/movies.php?category=Hindi+Dubbed&limit=$MAX_LIMIT"
+        // Base movie categories (without 4K)
+        val baseCategories = listOf(
+            "Latest" to "",
+            "Hollywood" to "Hollywood",
+            "Bollywood" to "Bollywood",
+            "Animation" to "Animation",
+            "Franch" to "Franch",
+            "Indian Bangla" to "Indian+Bangla",
+            "Korean" to "Korean",
+            "Tamil" to "Tamil",
+            "Hindi Dubbed" to "Hindi+Dubbed"
         )
 
-        val movieLists = movieCategories.mapNotNull { (catName, url) ->
-            val movies = fetchMovies(url)
-            if (movies.isEmpty()) null
-            else HomePageList("Movies - $catName", movies.map { it.toSearchResult(false) })
+        // Build lists: normal + 4K variants
+        val movieLists = mutableListOf<HomePageList>()
+
+        baseCategories.forEach { (displayName, categoryParam) ->
+            // Normal version
+            val normalUrl = if (categoryParam.isBlank()) {
+                "$apiUrl/movies.php?limit=$MAX_LIMIT"
+            } else {
+                "$apiUrl/movies.php?category=$categoryParam&limit=$MAX_LIMIT"
+            }
+            val normalMovies = fetchMovies(normalUrl)
+            if (normalMovies.isNotEmpty()) {
+                movieLists.add(
+                    HomePageList("Movies - $displayName", normalMovies.map { it.toSearchResult(false) })
+                )
+            }
+
+            // 4K version – using quality=4K as guess; change if needed
+            val fourKUrl = if (categoryParam.isBlank()) {
+                "$apiUrl/movies.php?quality=4K&limit=$MAX_LIMIT"   // for "Latest 4K"
+            } else {
+                "$apiUrl/movies.php?category=$categoryParam&quality=4K&limit=$MAX_LIMIT"
+            }
+            val fourKMovies = fetchMovies(fourKUrl)
+            if (fourKMovies.isNotEmpty()) {
+                movieLists.add(
+                    HomePageList("4K - $displayName", fourKMovies.map { it.toSearchResult(false) })
+                )
+            }
         }
 
-        // ---- TV SERIES ----
+        // ---- TV SERIES (no 4K version unless you want to add) ----
         val seriesCategories = listOf(
-            "Latest" to "$tvApiUrl?limit=$MAX_LIMIT",
-            "Hollywood" to "$tvApiUrl?category=Hollywood&limit=$MAX_LIMIT",
-            "Bollywood" to "$tvApiUrl?category=Bollywood&limit=$MAX_LIMIT",
-            "Animation" to "$tvApiUrl?category=Animation&limit=$MAX_LIMIT",
-            "Franch" to "$tvApiUrl?category=Franch&limit=$MAX_LIMIT",
-            "Indian Bangla" to "$tvApiUrl?category=Indian+Bangla&limit=$MAX_LIMIT",
-            "Korean" to "$tvApiUrl?category=Korean&limit=$MAX_LIMIT",
-            "Tamil" to "$tvApiUrl?category=Tamil&limit=$MAX_LIMIT",
-            "Hindi Dubbed" to "$tvApiUrl?category=Hindi+Dubbed&limit=$MAX_LIMIT"
+            "Latest" to "",
+            "Hollywood" to "Hollywood",
+            "Bollywood" to "Bollywood",
+            "Animation" to "Animation",
+            "Franch" to "Franch",
+            "Indian Bangla" to "Indian+Bangla",
+            "Korean" to "Korean",
+            "Tamil" to "Tamil",
+            "Hindi Dubbed" to "Hindi+Dubbed"
         )
 
-        val seriesLists = seriesCategories.mapNotNull { (catName, url) ->
+        val seriesLists = seriesCategories.mapNotNull { (catName, categoryParam) ->
+            val url = if (categoryParam.isBlank()) {
+                "$tvApiUrl?limit=$MAX_LIMIT"
+            } else {
+                "$tvApiUrl?category=$categoryParam&limit=$MAX_LIMIT"
+            }
             val series = fetchMovies(url)
             if (series.isEmpty()) null
             else HomePageList("TV Series - $catName", series.map { it.toSearchResult(true) })
