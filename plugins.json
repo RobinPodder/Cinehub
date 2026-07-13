@@ -9,13 +9,13 @@
             "YourName"
         ],
         "description": "Watch movies from CineHub24",
-        "fileSize": 13591,
+        "fileSize": 13729,
         "repositoryUrl": "https://github.com/RobinPodder/Cinehub",
         "tvTypes": [
             "Movie"
         ],
         "iconUrl": "https://www.google.com/s2/favicons?domain=cinehub24.com&sz=%size%",
         "apiVersion": 1,
-        "fileHash": "sha256-563e930b830c6e2cd2e3a6731186e8fbd4d8f3057a3dd8c7a0485c0490f33737"
+        "fileHash": "sha256-02e488560b5627bcd6b330d670c3bce44a9b5c7395f74c6c75643626e1bb606d"
     }
 ]
