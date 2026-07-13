@@ -72,7 +72,6 @@ class CineHub24 : MainAPI() {
             "Hindi Dubbed" to "Hindi+Dubbed"
         )
 
-        // Build lists: normal + 4K variants
         val movieLists = mutableListOf<HomePageList>()
 
         baseCategories.forEach { (displayName, categoryParam) ->
@@ -89,11 +88,13 @@ class CineHub24 : MainAPI() {
                 )
             }
 
-            // 4K version – using quality=4K as guess; change if needed
+            // 4K version – now using category=4K (change if needed)
+            // Alternative parameters to try: quality=4K, resolution=4k, genre=4K
             val fourKUrl = if (categoryParam.isBlank()) {
-                "$apiUrl/movies.php?quality=4K&limit=$MAX_LIMIT"   // for "Latest 4K"
+                "$apiUrl/movies.php?category=4K&limit=$MAX_LIMIT"   // for "Latest 4K"
             } else {
-                "$apiUrl/movies.php?category=$categoryParam&quality=4K&limit=$MAX_LIMIT"
+                "$apiUrl/movies.php?category=$categoryParam&category=4K&limit=$MAX_LIMIT"
+                // If that doesn't work, try: "$apiUrl/movies.php?category=$categoryParam&quality=4K&limit=$MAX_LIMIT"
             }
             val fourKMovies = fetchMovies(fourKUrl)
             if (fourKMovies.isNotEmpty()) {
@@ -103,7 +104,7 @@ class CineHub24 : MainAPI() {
             }
         }
 
-        // ---- TV SERIES (no 4K version unless you want to add) ----
+        // ---- TV SERIES ----
         val seriesCategories = listOf(
             "Latest" to "",
             "Hollywood" to "Hollywood",
