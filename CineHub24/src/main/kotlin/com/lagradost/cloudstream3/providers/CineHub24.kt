@@ -7,6 +7,9 @@ import org.json.JSONObject
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.BasePlugin
 
+// Moved to top level – allows const val
+private const val MAX_LIMIT = 99999
+
 class CineHub24 : MainAPI() {
     override var mainUrl = "http://www.cinehub24.com"
     override var name = "CineHub24"
@@ -37,9 +40,6 @@ class CineHub24 : MainAPI() {
 
     private val apiUrl = "http://203.76.96.50/api/v1"
     private val tvApiUrl = "http://203.76.96.50/api/v1/tv.php" // guess – change if needed
-
-    // We'll use a huge limit to try and get everything the server can give.
-    private const val MAX_LIMIT = 99999
 
     private suspend fun fetchMovies(url: String): List<JSONObject> {
         return try {
