@@ -11,7 +11,7 @@ class CineHub24 : MainAPI() {
     override var mainUrl = "http://www.cinehub24.com"
     override var name = "CineHub24"
     override val hasMainPage = true
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries) // now supports both
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     private val posterBaseUrl = "https://image.tmdb.org/t/p/w500/"
 
@@ -27,7 +27,6 @@ class CineHub24 : MainAPI() {
         val encodedUrl = listOf(id, title, poster ?: "", watchLink, plot.replace("|", " "))
             .joinToString("|||")
 
-        // Determine type based on parameter
         val tvType = if (isSeries) TvType.TvSeries else TvType.Movie
 
         return newMovieSearchResponse(title, encodedUrl, tvType) {
@@ -37,9 +36,10 @@ class CineHub24 : MainAPI() {
     }
 
     private val apiUrl = "http://203.76.96.50/api/v1"
+    private val tvApiUrl = "http://203.76.96.50/api/v1/tv.php" // guess – change if needed
 
-    // Guessed TV Series endpoint – CHANGE THIS if the actual one is different
-    private val tvApiUrl = "http://203.76.96.50/api/v1/tv.php" // might be series.php or with a parameter
+    // We'll use a huge limit to try and get everything the server can give.
+    private const val MAX_LIMIT = 99999
 
     private suspend fun fetchMovies(url: String): List<JSONObject> {
         return try {
@@ -62,58 +62,54 @@ class CineHub24 : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         // ---- MOVIES ----
         val movieCategories = listOf(
-            "Latest" to "$apiUrl/movies.php",
-            "Hollywood" to "$apiUrl/movies.php?category=Hollywood",
-            "Bollywood" to "$apiUrl/movies.php?category=Bollywood",
-            "Animation" to "$apiUrl/movies.php?category=Animation",
-            "Franch" to "$apiUrl/movies.php?category=Franch",         // added
-            "Indian Bangla" to "$apiUrl/movies.php?category=Indian+Bangla", // added
-            "Korean" to "$apiUrl/movies.php?category=Korean",
-            "Tamil" to "$apiUrl/movies.php?category=Tamil",
-            "Hindi Dubbed" to "$apiUrl/movies.php?category=Hindi+Dubbed"
+            "Latest" to "$apiUrl/movies.php?limit=$MAX_LIMIT",
+            "Hollywood" to "$apiUrl/movies.php?category=Hollywood&limit=$MAX_LIMIT",
+            "Bollywood" to "$apiUrl/movies.php?category=Bollywood&limit=$MAX_LIMIT",
+            "Animation" to "$apiUrl/movies.php?category=Animation&limit=$MAX_LIMIT",
+            "Franch" to "$apiUrl/movies.php?category=Franch&limit=$MAX_LIMIT",
+            "Indian Bangla" to "$apiUrl/movies.php?category=Indian+Bangla&limit=$MAX_LIMIT",
+            "Korean" to "$apiUrl/movies.php?category=Korean&limit=$MAX_LIMIT",
+            "Tamil" to "$apiUrl/movies.php?category=Tamil&limit=$MAX_LIMIT",
+            "Hindi Dubbed" to "$apiUrl/movies.php?category=Hindi+Dubbed&limit=$MAX_LIMIT"
         )
 
         val movieLists = movieCategories.mapNotNull { (catName, url) ->
             val movies = fetchMovies(url)
             if (movies.isEmpty()) null
-            else HomePageList("Movies - $catName", movies.map { it.toSearchResult(isSeries = false) })
+            else HomePageList("Movies - $catName", movies.map { it.toSearchResult(false) })
         }
 
         // ---- TV SERIES ----
-        // Using the same categories but with the tvApiUrl – verify this endpoint!
         val seriesCategories = listOf(
-            "Latest" to "$tvApiUrl",
-            "Hollywood" to "$tvApiUrl?category=Hollywood",
-            "Bollywood" to "$tvApiUrl?category=Bollywood",
-            "Animation" to "$tvApiUrl?category=Animation",
-            "Franch" to "$tvApiUrl?category=Franch",
-            "Indian Bangla" to "$tvApiUrl?category=Indian+Bangla",
-            "Korean" to "$tvApiUrl?category=Korean",
-            "Tamil" to "$tvApiUrl?category=Tamil",
-            "Hindi Dubbed" to "$tvApiUrl?category=Hindi+Dubbed"
+            "Latest" to "$tvApiUrl?limit=$MAX_LIMIT",
+            "Hollywood" to "$tvApiUrl?category=Hollywood&limit=$MAX_LIMIT",
+            "Bollywood" to "$tvApiUrl?category=Bollywood&limit=$MAX_LIMIT",
+            "Animation" to "$tvApiUrl?category=Animation&limit=$MAX_LIMIT",
+            "Franch" to "$tvApiUrl?category=Franch&limit=$MAX_LIMIT",
+            "Indian Bangla" to "$tvApiUrl?category=Indian+Bangla&limit=$MAX_LIMIT",
+            "Korean" to "$tvApiUrl?category=Korean&limit=$MAX_LIMIT",
+            "Tamil" to "$tvApiUrl?category=Tamil&limit=$MAX_LIMIT",
+            "Hindi Dubbed" to "$tvApiUrl?category=Hindi+Dubbed&limit=$MAX_LIMIT"
         )
 
         val seriesLists = seriesCategories.mapNotNull { (catName, url) ->
             val series = fetchMovies(url)
             if (series.isEmpty()) null
-            else HomePageList("TV Series - $catName", series.map { it.toSearchResult(isSeries = true) })
+            else HomePageList("TV Series - $catName", series.map { it.toSearchResult(true) })
         }
 
-        // Combine both lists
         val allLists = movieLists + seriesLists
         return newHomePageResponse(allLists, hasNext = false)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // Search both movies and series (optional)
-        val movieResults = fetchMovies("$apiUrl/movies.php")
+        val movieResults = fetchMovies("$apiUrl/movies.php?limit=$MAX_LIMIT")
             .filter { it.optString("MovieTitle").contains(query, ignoreCase = true) }
-            .map { it.toSearchResult(isSeries = false) }
+            .map { it.toSearchResult(false) }
 
-        // Also try searching TV series – but might return same results if endpoint is wrong
-        val seriesResults = fetchMovies("$tvApiUrl")
+        val seriesResults = fetchMovies("$tvApiUrl?limit=$MAX_LIMIT")
             .filter { it.optString("MovieTitle").contains(query, ignoreCase = true) }
-            .map { it.toSearchResult(isSeries = true) }
+            .map { it.toSearchResult(true) }
 
         return movieResults + seriesResults
     }
@@ -125,9 +121,6 @@ class CineHub24 : MainAPI() {
         val watchLink = parts.getOrElse(3) { "" }
         val plot = parts.getOrElse(4) { "" }
 
-        // We can't differentiate type from the URL, but we can assume movie or series.
-        // You could store the type in the encoded URL as well. For simplicity, we treat as Movie.
-        // But since we have watchLink, loadLinks will handle it.
         return newMovieLoadResponse(title, url, TvType.Movie, watchLink) {
             this.posterUrl = poster
             this.plot = plot
