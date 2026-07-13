@@ -37,7 +37,14 @@ class CineHub24 : MainAPI() {
 
     private suspend fun fetchMovies(url: String): List<JSONObject> {
         return try {
-            val text = app.get(url).text
+            val text = app.get(
+                url,
+                headers = mapOf(
+                    "Referer" to "$mainUrl/",
+                    "X-Requested-With" to "XMLHttpRequest",
+                    "Accept" to "application/json, text/plain, */*"
+                )
+            ).text
             val arr = JSONArray(text)
             (0 until arr.length()).map { arr.getJSONObject(it) }
         } catch (e: Exception) {
